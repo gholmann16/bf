@@ -1,3 +1,5 @@
 /target
 *.bf
-*.nasm
+*.asm
+*.o
+*.out
