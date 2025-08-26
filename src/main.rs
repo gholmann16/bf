@@ -1,3 +1,5 @@
+mod brainfuck;
+
 fn main() {
-    println!("Hello, world!");
+    brainfuck::compile("test.bf");
 }
