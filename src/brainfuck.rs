@@ -2,11 +2,8 @@ use std::fs;
 use std::process;
 
 // Accepts utf-8 string with only brainfuck characters, ignores everything else
-// Returns true if it compiles, false if it doesn't
-// As for io errors, just crash, because this isn't a user facing project
-
-pub fn compile(filename: &str) {
-    let code: String = fs::read_to_string(filename).unwrap();
+pub fn compile(path: &str, file: Option<&str>) {
+    let code: String = fs::read_to_string(path).unwrap();
     
     let mut output = String::new();
     output += "global _start\n";
@@ -58,11 +55,21 @@ pub fn compile(filename: &str) {
     output += "mov rax, 60\n";
     output += "syscall\n";
 
-    let name = &filename[..filename.len()-2];
-    let newname = String::from(name) + "asm";
-    let objname = String::from(name) + "o";
-    fs::write(&newname, output).unwrap();
+    let name = &path[..path.len()-2];
 
-    process::Command::new("nasm").arg("-felf64").arg(&newname).status().expect("Nasm failed to assemble");
-    process::Command::new("ld").arg(&objname).status().expect("Ld failed to link");
+    let assembly = String::from(name) + "s";
+    let object = String::from(name) + "o";
+
+    fs::write(&assembly, output).unwrap();
+
+    process::Command::new("nasm").arg("-felf64").arg(&assembly).status().expect("Nasm failed to assemble");
+    fs::remove_file(&assembly).expect("Failed to remove assembly file");
+
+    process::Command::new("ld").arg(&object).status().expect("Ld failed to link");
+    fs::remove_file(&object).expect("Failed to remove object file");
+
+    match file {
+        None => (),
+        Some(o) => fs::rename(&path, o).expect("Failed to rename output file"),
+    }
 }
