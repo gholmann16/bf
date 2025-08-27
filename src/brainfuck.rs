@@ -1,11 +1,11 @@
 use std::fs;
-use std::process::Command;
+use std::process;
 
 // Accepts utf-8 string with only brainfuck characters, ignores everything else
 // Returns true if it compiles, false if it doesn't
 // As for io errors, just crash, because this isn't a user facing project
 
-pub fn compile(filename: &str) -> bool {
+pub fn compile(filename: &str) {
     let code: String = fs::read_to_string(filename).unwrap();
     
     let mut output = String::new();
@@ -16,9 +16,9 @@ pub fn compile(filename: &str) -> bool {
     output += "_start:\n";
     output += "xor rax, rax\n"; //Set initial position to 0
 
-    let mut open: u32 = 0;
-    let mut close: u32 = 0;
-    let mut list: Vec<u32> = Vec::new();
+    let mut open: usize = 0;
+    let mut close: usize = 0;
+    let mut list: Vec<usize> = Vec::new();
 
     for c in code.chars() {
         match c {
@@ -36,7 +36,8 @@ pub fn compile(filename: &str) -> bool {
             ']' => {
                 close += 1;
                 if close > open {
-                    return false;
+                    println!("Bracket mismatch error. Closing bracket ']' found with no matching opening bracket '['");
+                    process::exit(1);
                 }
                 let jump = list.pop().expect("Bracket mismatch error, should never happen");
                 output += &format!("jmp open_{}\n", jump.to_string());
@@ -48,7 +49,8 @@ pub fn compile(filename: &str) -> bool {
 
     // Every bracket must have a match
     if open != close {
-        return false;
+        println!("Not enough closing brackets ']'. Must have one per opening bracket '['.");
+        process::exit(2);
     }
 
     // Exit boilerplate
@@ -61,7 +63,6 @@ pub fn compile(filename: &str) -> bool {
     let objname = String::from(name) + "o";
     fs::write(&newname, output).unwrap();
 
-    Command::new("nasm").arg("-felf64").arg(&newname).status().expect("Nasm failed to assemble");
-    Command::new("ld").arg(&objname).status().expect("Ld failed to link");
-    return true;
+    process::Command::new("nasm").arg("-felf64").arg(&newname).status().expect("Nasm failed to assemble");
+    process::Command::new("ld").arg(&objname).status().expect("Ld failed to link");
 }
