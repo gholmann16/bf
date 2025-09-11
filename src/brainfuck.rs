@@ -11,7 +11,7 @@ pub fn compile(path: &str, file: Option<&str>) {
     output += "memory: resb 65536\n"; // Declare memory space
     output += "section .text\n";
     output += "_start:\n";
-    output += "xor rax, rax\n"; //Set initial position to 0
+    output += "xor rbx, rbx\n"; //Set initial position to 0
 
     let mut open: usize = 0;
     let mut close: usize = 0;
@@ -19,26 +19,43 @@ pub fn compile(path: &str, file: Option<&str>) {
 
     for c in code.chars() {
         match c {
-            '<' => output += "sub ax, 1\n",
-            '>' => output += "add ax, 1\n",
-            '+' => output += "add byte[memory + rax], 1\n",
-            '-' => output += "sub byte[memory + rax], 1\n",
+            '<' => output += "sub bx, 1\n",
+            '>' => output += "add bx, 1\n",
+            '+' => output += "add byte[memory + rbx], 1\n",
+            '-' => output += "sub byte[memory + rbx], 1\n",
             '[' => {
                 open += 1;
                 list.push(open);
+
                 output += &format!("open_{}:\n", open.to_string());
-                output += "cmp byte[memory + rax], 0\n";
+                output += "cmp byte[memory + rbx], 0\n";
                 output += &format!("jz close_{}\n", open.to_string());
             },
             ']' => {
                 close += 1;
-                if close > open {
+                let Some(jump) = list.pop() else { // If list is empty, we have run out of opening brackets to jmp to
                     println!("Bracket mismatch error. Closing bracket ']' found with no matching opening bracket '['");
                     process::exit(1);
-                }
-                let jump = list.pop().expect("Bracket mismatch error, should never happen");
-                output += &format!("jmp open_{}\n", jump.to_string());
-                output += &format!("close_{}:\n", close.to_string()); 
+                };
+
+                output += &format!("jmp open_{}\n", jump.to_string()); // Always go back, because if it's 0 it will jump right back to close
+                output += &format!("close_{}:\n", close.to_string());
+            },
+            '.' => {
+                output += "mov rax, 1\n"; // Write syscall
+                output += "mov rdi, 1\n"; // fd = stdout
+                output += "mov rdx, 1\n"; // size = 1
+                output += "mov rsi, memory\n";
+                output += "add rsi, rbx\n";
+                output += "syscall\n";
+            },
+            ',' => {
+                output += "mov rax, 0\n"; // Read syscall
+                output += "mov rdi, 0\n"; // fd = stdin
+                output += "mov rdx, 1\n"; // size = 1
+                output += "mov rsi, memory\n";
+                output += "add rsi, rbx\n";
+                output += "syscall\n";
             },
             _ => (),
         }
@@ -51,7 +68,7 @@ pub fn compile(path: &str, file: Option<&str>) {
     }
 
     // Exit boilerplate
-    output += "movzx rdi, byte [memory + rax]\n";
+    output += "movzx rdi, byte [memory + rbx]\n";
     output += "mov rax, 60\n";
     output += "syscall\n";
 
